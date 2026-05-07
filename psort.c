@@ -7,6 +7,7 @@
 #include <sys/sysinfo.h>
 #include <pthread.h>
 #include <stdlib.h>
+#include <inttypes.h>
 
 #define NUM_THREADS get_nprocs()
 #define RANGE 65535 // might be too small
@@ -131,7 +132,13 @@ int main(int argc, char* argv[]) {
         globalCount[m] += globalCount[m-1];
     }
 
-    
+    // place each key into output array index
+    for (long i = 0; i < numRecs; i++) {
+        int key = A[i].key;
+        int outputIndex = --globalCount[key];
+        B[outputIndex] = A[i];
+        printf("%" PRId32 "", B[outputIndex].key);
+    }
 
 
     close(f);
