@@ -18,8 +18,8 @@ typedef struct {
     char data[96]; 
 } rec;
 
-rec *A; // input
-rec *B; // output
+rec *A; // input & output
+rec *B; // swapping array
 
 size_t numRecs;
 
@@ -66,7 +66,7 @@ int main(int argc, char* argv[]) {
     }
 
     // array to be sorted
-    A = mmap(NULL, data.st_size, PROT_READ, MAP_PRIVATE, f, 0);
+    A = mmap(NULL, data.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, f, 0);
     if (A == MAP_FAILED) {
         perror("mmap error");
         return 1;
@@ -100,9 +100,11 @@ int main(int argc, char* argv[]) {
             }
             args[i].shift = shift;
 
-            for (int y = 0; y < BIT; y++) {
-                args[y].localCount[y] = 0;
-            }
+            args[i].localCount = calloc(BIT, sizeof(int));
+            if (!args[i].localCount) {
+                perror("calloc error\n");
+                exit(1);
+            } 
 
             pthread_create(&threads[i], NULL, count, &args[i]);
             printf("test\n");
@@ -133,14 +135,25 @@ int main(int argc, char* argv[]) {
         }
 
         // place each key into output array index
-        for (long i = numRecs; i >= 0; i--) {
+        for (long i = numRecs - 1; i >= 0; i--) {
             uint32_t key = (uint32_t)A[i].key;
             int dig = (key >> shift) & 0xFF;
 
             int outputIndex = --globalCount[dig];
             B[outputIndex] = A[i];
-            printf("%" PRId32 "", B[outputIndex].key);
         }
+
+        for (int t = 0; t < NUM_THREADS; t++) {
+            free(args[t].localCount);
+        }
+
+        rec *temp = A;
+        A = B;
+        B = temp;
+    }
+
+    for (size_t f = 0; f < numRecs; f++) {
+        printf("%" PRId32 "\n", A[f].key);
     }
 
     free(B);
