@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <inttypes.h>
+#include <string.h>
 
 #define NUM_THREADS get_nprocs()
 #define BIT 256
@@ -65,23 +66,66 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    char *fileRecords;
+
     // array to be sorted
-    A = mmap(NULL, data.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, f, 0);
-    if (A == MAP_FAILED) {
+    fileRecords = mmap(NULL, data.st_size, PROT_READ, MAP_PRIVATE, f, 0);
+    if (fileRecords == MAP_FAILED) {
         perror("mmap error");
         return 1;
     }
 
-    numRecs = data.st_size / sizeof(rec);
+    A = malloc(data.st_size / sizeof(rec));
 
-    printf("Records: %zu\n", numRecs);
-    printf("Threads: %d\n", NUM_THREADS);
+    rec *originalA = A;
 
     B = malloc(numRecs * sizeof(rec));
     if (!B) {
         perror("malloc B failed\n");
         return 1;
     }
+
+    rec *originalB = B;
+
+    numRecs = data.st_size / sizeof(rec);
+    size_t counter = 0;
+
+    while (counter < data.st_size) {
+        char *lStart = &fileRecords[counter];
+
+        size_t len = 0;
+
+        while(counter < data.st_size && fileRecords[counter] != '\n') {
+            counter++;
+            len++;
+        }
+
+        rec r;
+
+        if (len >= 4) {
+            memcpy(&r.key, lStart, 4);
+        }
+        else {
+            r.key = 0;
+        }
+
+        size_t restOfString = len - 4;
+        if (restOfString > 95) {
+            restOfString = 95;
+        }
+
+        memcpy(r.data, lStart + 4, restOfString);
+        r.data[restOfString] = '\0';
+
+        A[numRecs++] = r;
+
+        counter++;
+    }
+
+    printf("Records: %zu\n", numRecs);
+    printf("Threads: %d\n", NUM_THREADS);
+
+    
 
     int chunk = (numRecs + NUM_THREADS - 1) / NUM_THREADS;
     printf("Chunk size: %d\n", chunk);
@@ -153,13 +197,14 @@ int main(int argc, char* argv[]) {
     }
 
     for (size_t f = 0; f < numRecs; f++) {
-        printf("%" PRId32 "\n", A[f].key);
-        write(STDOUT_FILENO, A[f].data, 96);
-        printf("\n");
+
+        char *oRec = (char*)&A[f].key;
+
+        printf("%c%c%c%c%s\n", oRec[0], oRec[1], oRec[2], oRec[3], A[f].data);
     }
 
-    free(B);
-    munmap(A, data.st_size);
+    free(originalB);
+    munmap(originalA, data.st_size);
     close(f);
 
     return 0;
