@@ -154,6 +154,8 @@ int main(int argc, char* argv[]) {
 
     for (size_t f = 0; f < numRecs; f++) {
         printf("%" PRId32 "\n", A[f].key);
+        write(STDOUT_FILENO, A[f].data, 96);
+        printf("\n");
     }
 
     free(B);
