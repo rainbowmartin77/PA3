@@ -113,6 +113,21 @@ int main(int argc, char* argv[]) {
         pthread_join(threads[i], NULL);
     }
 
+    globalCount = calloc(RANGE, sizeof(int));
+    if (!globalCount) {
+        perror("calloc 2 failed\n");
+        return 1;
+    }
+
+    // sum the counts of each key value
+    for (int x = 0; x < NUM_THREADS; x++) {
+        for (int j = 0; j < RANGE; j++) {
+            globalCount[j] +=args[x].localCount[x];
+        }
+    }
+
+
+
     close(f);
 
     return 0;
