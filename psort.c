@@ -22,7 +22,7 @@ typedef struct {
 rec *A; // input & output
 rec *B; // swapping array
 
-size_t numRecs;
+size_t numRecs = 0;
 
 typedef struct {
     int threadID;
@@ -79,15 +79,8 @@ int main(int argc, char* argv[]) {
 
     rec *originalA = A;
 
-    B = malloc(numRecs * sizeof(rec));
-    if (!B) {
-        perror("malloc B failed\n");
-        return 1;
-    }
-
-    rec *originalB = B;
-
     numRecs = data.st_size / sizeof(rec);
+
     size_t counter = 0;
 
     while (counter < data.st_size) {
@@ -119,16 +112,23 @@ int main(int argc, char* argv[]) {
 
         A[numRecs++] = r;
 
+
         counter++;
     }
 
     printf("Records: %zu\n", numRecs);
     printf("Threads: %d\n", NUM_THREADS);
 
-    
+    B = malloc(numRecs * sizeof(rec));
+    if (!B) {
+        perror("malloc B failed\n");
+        return 1;
+    }
 
-    int chunk = (numRecs + NUM_THREADS - 1) / NUM_THREADS;
-    printf("Chunk size: %d\n", chunk);
+    rec *originalB = B;
+
+    size_t chunk = (numRecs + NUM_THREADS - 1) / NUM_THREADS;
+    printf("Chunk size: %zu\n", chunk);
 
     for (int p = 0; p < 4; p++) {
 
