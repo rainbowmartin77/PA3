@@ -7,7 +7,8 @@
 #include <sys/sysinfo.h>
 #include <pthread.h>
 
-#define MAX = 4294967296;
+#define MAX (int)INT32_MAX
+#define NUM_THREADS get_nprocs()
 #define arrSize(x) (sizeof(x) / sizeof((x)[0]))
 
 typedef struct {
@@ -15,23 +16,26 @@ typedef struct {
     char data[96]; 
 } rec;
 
-typedef struct {
-    rec *arr;
-    size_t start;
-    size_t end;
-} threadRecArray;
+rec *A, *B, *C; // global arrays
 
 void* count(void* arg) {
-    // Array A - to be sorted
-    rec* thisChunk = (rec*)arg;
-    // size of array A
-    int n = arrSize(thisChunk);
-    int32_t max = INT32_MAX;
+    long id = (long)arg;
+
+    printf("Thread number %ld\n", id);
+
+    size_t len = sizeof(A) / sizeof(A[0]);
+    int chunk = (int)((len + NUM_THREADS -1) / NUM_THREADS);
+    int start = id * chunk;
+    int end = (start + chunk > len) ? len : start + chunk;
 
     
+    pthread_exit(NULL);
 }
 
 int main(int argc, char* argv[]) {
+    // create threads
+    pthread_t threads[NUM_THREADS];
+
     int f = open(argv[1], O_RDONLY);
     if (f == -1) {
         perror("Error");
@@ -46,37 +50,23 @@ int main(int argc, char* argv[]) {
     }
 
     // array to be sorted
-    rec *mapped = mmap(NULL, data.st_size, PROT_READ, MAP_PRIVATE, f, 0);
-    if (mapped == MAP_FAILED) {
+    A = mmap(NULL, data.st_size, PROT_READ, MAP_PRIVATE, f, 0);
+    if (A == MAP_FAILED) {
         perror("mmap error");
         return 1;
     }
 
-    size_t numRecs = data.st_size / sizeof(rec);
+    //size_t numRecs = data.st_size / sizeof(rec);
+    
 
-    // number of threads - available processors available
-    int numThreads = get_nprocs();
-    // records per thread
-    int threadChunk = (int)(data.st_size / numThreads);
-    // array of mapped array chunks to go to each thread
-    threadRecArray arr[numThreads];
-
-    // create threads
-    pthread_t threads[numThreads];
-    for (int i = 0; i < numThreads; i++) {
-        arr[i].arr = mapped;
-        arr[i].start = i * threadChunk;
-        arr[i].end = (i == numThreads - 1) ? numRecs : (i + 1) * threadChunk;
-        pthread_create(&threads[i], NULL, count, &arr[i]);
+    
+    for (long i = 0; i < NUM_THREADS; i++) {
+        pthread_create(&threads[i], NULL, count, (void *)i);
     }
 
-    for (int i = 0; i < numThreads; i++) {
+    for (int i = 0; i < NUM_THREADS; i++) {
         pthread_join(threads[i], NULL);
     }
-
-    
-    
-    
 
     close(f);
 
