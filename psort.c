@@ -44,9 +44,10 @@ void* count(void* arg) {
 
     for (size_t i = thisThreadData->start; i <= thisThreadData->end; i++) {
         int key = A[i].key;
+        int normalized = key - thisThreadData->min;
 
         if (key >= 0 && key < thisThreadData->RANGE) {
-            thisThreadData->localCount[key]++;
+            thisThreadData->localCount[normalized]++;
         }
     }
 
@@ -156,7 +157,8 @@ int main(int argc, char* argv[]) {
     // place each key into output array index
     for (long i = 0; i < numRecs; i++) {
         int key = A[i].key;
-        int outputIndex = --globalCount[key];
+        int normalizedKey = key - min;
+        int outputIndex = --globalCount[normalizedKey];
         B[outputIndex] = A[i];
         printf("%" PRId32 "", B[outputIndex].key);
     }
