@@ -10,7 +10,7 @@
 #include <inttypes.h>
 
 #define NUM_THREADS get_nprocs()
-#define RANGE 65535 // might be too small
+//#define RANGE 65535 // might be too small
 
 typedef struct {
     int32_t key;
@@ -28,6 +28,8 @@ typedef struct {
     size_t start;
     size_t end;
     int *localCount;
+    int32_t min;
+    int RANGE;
 } entryArg;
 
 void* count(void* arg) {
@@ -38,10 +40,12 @@ void* count(void* arg) {
     int start = id * chunk;
     int end = (start + chunk > len) ? len : start + chunk;*/
 
-    for (size_t i = thisThreadData->start; i < thisThreadData->end; i++) {
+
+
+    for (size_t i = thisThreadData->start; i <= thisThreadData->end; i++) {
         int key = A[i].key;
 
-        if (key >= 0 && key < RANGE) {
+        if (key >= 0 && key < thisThreadData->RANGE) {
             thisThreadData->localCount[key]++;
         }
     }
@@ -79,6 +83,21 @@ int main(int argc, char* argv[]) {
     }
 
     numRecs = data.st_size / sizeof(rec);
+    int32_t min = A[0].key;
+    int32_t max = A[0].key;
+
+    // search for min and max key values?
+    // takes too long?
+    for (size_t s = 1; s < numRecs; s++) {
+        if (A[s].key < min) {
+            min = A[s].key;
+        }
+        if (A[s].key > max) {
+            max = A[s].key;
+        }
+    }
+
+    int range = max = min + 1;
 
     printf("Records: %zu\n", numRecs);
     printf("Threads: %d\n", NUM_THREADS);
@@ -96,12 +115,14 @@ int main(int argc, char* argv[]) {
         args[i].threadID = i;
         args[i].start = i * chunk;
         args[i].end = ((i + 1) * chunk) - 1;
+        args[i].min = min;
+        args[i].RANGE = range;
 
         if (args[i].end == numRecs) {
             args[i].end = numRecs - 1;
         }
 
-        args[i].localCount = calloc(RANGE, sizeof(int));
+        args[i].localCount = calloc(range, sizeof(int));
         if (!args[i]. localCount) {
             perror("calloc error\n");
             return 1;
@@ -114,7 +135,7 @@ int main(int argc, char* argv[]) {
         pthread_join(threads[i], NULL);
     }
 
-    globalCount = calloc(RANGE, sizeof(int));
+    globalCount = calloc(range, sizeof(int));
     if (!globalCount) {
         perror("calloc 2 failed\n");
         return 1;
@@ -122,13 +143,13 @@ int main(int argc, char* argv[]) {
 
     // sum the counts of each key value
     for (int x = 0; x < NUM_THREADS; x++) {
-        for (int j = 0; j < RANGE; j++) {
+        for (int j = 0; j < range; j++) {
             globalCount[j] += args[x].localCount[j];
         }
     }
 
     // count how many elements per key
-    for (int m = 1; m < RANGE; m++) {
+    for (int m = 1; m < range; m++) {
         globalCount[m] += globalCount[m-1];
     }
 
