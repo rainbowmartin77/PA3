@@ -6,6 +6,7 @@
 #include <sys/mman.h>
 #include <sys/sysinfo.h>
 #include <pthread.h>
+#include <stdlib.h>
 
 #define NUM_THREADS get_nprocs()
 #define RANGE 65535 // might be too small
@@ -31,10 +32,6 @@ typedef struct {
 void* count(void* arg) {
     entryArg *thisThreadData = (entryArg*)arg;
 
-    printf("Thread number %zu\n", thisThreadData.threadID);
-    printf("Thread start: %zu\n", thisThreadData.start);
-    printf("Thread end: %zu\n", thisThreadData.end);
-
     /*size_t len = sizeof(A) / sizeof(A[0]);
     int chunk = (int)((len + NUM_THREADS -1) / NUM_THREADS);
     int start = id * chunk;
@@ -44,11 +41,14 @@ void* count(void* arg) {
         int key = A[i].key;
 
         if (key >= 0 && key < RANGE) {
-            t->localCount[key]__;
+            thisThreadData->localCount[key];
         }
     }
 
-    
+    printf("Thread number %d\n", thisThreadData->threadID);
+    printf("Thread %d start: %zu\n", thisThreadData->threadID, thisThreadData->start);
+    printf("Thread %d end: %zu\n", thisThreadData->threadID, thisThreadData->end);
+
     pthread_exit(NULL);
 }
 
@@ -89,14 +89,15 @@ int main(int argc, char* argv[]) {
     }
 
     int chunk = (numRecs + NUM_THREADS - 1) / NUM_THREADS;
+    printf("Chunk size: %d\n", chunk);
 
     for (long i = 0; i < NUM_THREADS; i++) {
         args[i].threadID = i;
-        args[i]. start = i * chunk;
-        args[i].end = (i + 1) * chunk;
+        args[i].start = i * chunk;
+        args[i].end = ((i + 1) * chunk) - 1;
 
-        if (args[i].end > numRecs) {
-            args[i].end = numRecs;
+        if (args[i].end == numRecs) {
+            args[i].end = numRecs - 1;
         }
 
         args[i].localCount = calloc(RANGE, sizeof(int));
