@@ -42,7 +42,7 @@ void* count(void* arg) {
         int key = A[i].key;
 
         if (key >= 0 && key < RANGE) {
-            thisThreadData->localCount[key];
+            thisThreadData->localCount[key]++;
         }
     }
 
