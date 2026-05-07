@@ -123,7 +123,7 @@ int main(int argc, char* argv[]) {
     // sum the counts of each key value
     for (int x = 0; x < NUM_THREADS; x++) {
         for (int j = 0; j < RANGE; j++) {
-            globalCount[j] +=args[x].localCount[x];
+            globalCount[j] += args[x].localCount[j];
         }
     }
 
