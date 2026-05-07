@@ -42,11 +42,11 @@ void* count(void* arg) {
 
 
 
-    for (size_t i = thisThreadData->start; i <= thisThreadData->end; i++) {
+    for (size_t i = thisThreadData->start; i < thisThreadData->end; i++) {
         int key = A[i].key;
         int normalized = key - thisThreadData->min;
 
-        if (key >= 0 && key < thisThreadData->RANGE) {
+        if (key >= 0 && normalized < thisThreadData->RANGE) {
             thisThreadData->localCount[normalized]++;
         }
     }
@@ -98,7 +98,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    int range = max = min + 1;
+    int range = max - min + 1;
 
     printf("Records: %zu\n", numRecs);
     printf("Threads: %d\n", NUM_THREADS);
@@ -115,12 +115,12 @@ int main(int argc, char* argv[]) {
     for (long i = 0; i < NUM_THREADS; i++) {
         args[i].threadID = i;
         args[i].start = i * chunk;
-        args[i].end = ((i + 1) * chunk) - 1;
+        args[i].end = ((i + 1) * chunk);
         args[i].min = min;
         args[i].RANGE = range;
 
-        if (args[i].end == numRecs) {
-            args[i].end = numRecs - 1;
+        if (args[i].end > numRecs) {
+            args[i].end = numRecs;
         }
 
         args[i].localCount = calloc(range, sizeof(int));
@@ -130,17 +130,22 @@ int main(int argc, char* argv[]) {
         }
 
         pthread_create(&threads[i], NULL, count, &args[i]);
+        printf("test\n");
     }
 
     for (int i = 0; i < NUM_THREADS; i++) {
         pthread_join(threads[i], NULL);
     }
 
+    printf("Test after joining\n");
+
     globalCount = calloc(range, sizeof(int));
     if (!globalCount) {
         perror("calloc 2 failed\n");
         return 1;
     }
+
+    printf("Test after calloc for B\n");
 
     // sum the counts of each key value
     for (int x = 0; x < NUM_THREADS; x++) {
@@ -149,16 +154,28 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    printf("Test after accumulating all counts\n");
+
     // count how many elements per key
     for (int m = 1; m < range; m++) {
         globalCount[m] += globalCount[m-1];
     }
 
     // place each key into output array index
-    for (long i = 0; i < numRecs; i++) {
+    for (long i = numRecs; i >= 0; i--) {
         int key = A[i].key;
         int normalizedKey = key - min;
+
+        if (normalizedKey < 0) {
+            printf("normalizedKey %d out of bounds\n", normalizedKey);
+            exit(1);
+        }
         int outputIndex = --globalCount[normalizedKey];
+        if (outputIndex < 0 || outputIndex > numRecs) {
+            printf("outputIndex out of range\n");
+            exit(1);
+        }
+        printf("test output\n");
         B[outputIndex] = A[i];
         printf("%" PRId32 "", B[outputIndex].key);
     }
