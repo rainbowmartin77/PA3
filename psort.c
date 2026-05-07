@@ -126,6 +126,12 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    // count how many elements per key
+    for (int m = 1; m < RANGE; m++) {
+        globalCount[m] += globalCount[m-1];
+    }
+
+    
 
 
     close(f);
