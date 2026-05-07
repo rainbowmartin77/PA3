@@ -10,6 +10,7 @@
 #include <inttypes.h>
 
 #define NUM_THREADS get_nprocs()
+#define BIT 256
 //#define RANGE 65535 // might be too small
 
 typedef struct {
@@ -21,34 +22,22 @@ rec *A; // input
 rec *B; // output
 
 size_t numRecs;
-int *globalCount;
 
 typedef struct {
     int threadID;
     size_t start;
     size_t end;
+    int shift;
     int *localCount;
-    int32_t min;
-    int RANGE;
 } entryArg;
 
 void* count(void* arg) {
     entryArg *thisThreadData = (entryArg*)arg;
 
-    /*size_t len = sizeof(A) / sizeof(A[0]);
-    int chunk = (int)((len + NUM_THREADS -1) / NUM_THREADS);
-    int start = id * chunk;
-    int end = (start + chunk > len) ? len : start + chunk;*/
-
-
-
     for (size_t i = thisThreadData->start; i < thisThreadData->end; i++) {
-        int key = A[i].key;
-        int normalized = key - thisThreadData->min;
-
-        if (key >= 0 && normalized < thisThreadData->RANGE) {
-            thisThreadData->localCount[normalized]++;
-        }
+        uint32_t key = (uint32_t)A[i].key;
+        int DIG = (key >> thisThreadData->shift) & 0xFF;
+        thisThreadData->localCount[DIG]++;
     }
 
     printf("Thread number %d\n", thisThreadData->threadID);
@@ -65,7 +54,7 @@ int main(int argc, char* argv[]) {
 
     int f = open(argv[1], O_RDONLY);
     if (f == -1) {
-        perror("Error");
+        perror("Open error");
         return 1;
     }
 
@@ -84,21 +73,6 @@ int main(int argc, char* argv[]) {
     }
 
     numRecs = data.st_size / sizeof(rec);
-    int32_t min = A[0].key;
-    int32_t max = A[0].key;
-
-    // search for min and max key values?
-    // takes too long?
-    for (size_t s = 1; s < numRecs; s++) {
-        if (A[s].key < min) {
-            min = A[s].key;
-        }
-        if (A[s].key > max) {
-            max = A[s].key;
-        }
-    }
-
-    int range = max - min + 1;
 
     printf("Records: %zu\n", numRecs);
     printf("Threads: %d\n", NUM_THREADS);
@@ -112,75 +86,65 @@ int main(int argc, char* argv[]) {
     int chunk = (numRecs + NUM_THREADS - 1) / NUM_THREADS;
     printf("Chunk size: %d\n", chunk);
 
-    for (long i = 0; i < NUM_THREADS; i++) {
-        args[i].threadID = i;
-        args[i].start = i * chunk;
-        args[i].end = ((i + 1) * chunk);
-        args[i].min = min;
-        args[i].RANGE = range;
+    for (int p = 0; p < 4; p++) {
 
-        if (args[i].end > numRecs) {
-            args[i].end = numRecs;
+        int shift = p * 8;
+
+        for (int i = 0; i < NUM_THREADS; i++) {
+            args[i].threadID = i;
+            args[i].start = i * chunk;
+            args[i].end = ((i + 1) * chunk);
+
+            if (args[i].end > numRecs) {
+                args[i].end = numRecs;
+            }
+            args[i].shift = shift;
+
+            for (int y = 0; y < BIT; y++) {
+                args[y].localCount[y] = 0;
+            }
+
+            pthread_create(&threads[i], NULL, count, &args[i]);
+            printf("test\n");
         }
 
-        args[i].localCount = calloc(range, sizeof(int));
-        if (!args[i]. localCount) {
-            perror("calloc error\n");
-            return 1;
+        for (int i = 0; i < NUM_THREADS; i++) {
+            pthread_join(threads[i], NULL);
         }
 
-        pthread_create(&threads[i], NULL, count, &args[i]);
-        printf("test\n");
-    }
+        printf("Test after joining\n");
 
-    for (int i = 0; i < NUM_THREADS; i++) {
-        pthread_join(threads[i], NULL);
-    }
+        int globalCount[BIT] = {0};
+    
+        printf("Test after calloc for B\n");
 
-    printf("Test after joining\n");
+        // sum the counts of each key value
+        for (int x = 0; x < NUM_THREADS; x++) {
+            for (int j = 0; j < BIT; j++) {
+                globalCount[j] += args[x].localCount[j];
+            }
+        }
 
-    globalCount = calloc(range, sizeof(int));
-    if (!globalCount) {
-        perror("calloc 2 failed\n");
-        return 1;
-    }
+        printf("Test after accumulating all counts\n");
 
-    printf("Test after calloc for B\n");
+        // count how many elements per key
+        for (int m = 1; m < BIT; m++) {
+            globalCount[m] += globalCount[m-1];
+        }
 
-    // sum the counts of each key value
-    for (int x = 0; x < NUM_THREADS; x++) {
-        for (int j = 0; j < range; j++) {
-            globalCount[j] += args[x].localCount[j];
+        // place each key into output array index
+        for (long i = numRecs; i >= 0; i--) {
+            uint32_t key = (uint32_t)A[i].key;
+            int dig = (key >> shift) & 0xFF;
+
+            int outputIndex = --globalCount[dig];
+            B[outputIndex] = A[i];
+            printf("%" PRId32 "", B[outputIndex].key);
         }
     }
 
-    printf("Test after accumulating all counts\n");
-
-    // count how many elements per key
-    for (int m = 1; m < range; m++) {
-        globalCount[m] += globalCount[m-1];
-    }
-
-    // place each key into output array index
-    for (long i = numRecs; i >= 0; i--) {
-        int key = A[i].key;
-        int normalizedKey = key - min;
-
-        if (normalizedKey < 0) {
-            printf("normalizedKey %d out of bounds\n", normalizedKey);
-            exit(1);
-        }
-        int outputIndex = --globalCount[normalizedKey];
-        if (outputIndex < 0 || outputIndex > numRecs) {
-            printf("outputIndex out of range\n");
-            exit(1);
-        }
-        printf("test output\n");
-        B[outputIndex] = A[i];
-        printf("%" PRId32 "", B[outputIndex].key);
-    }
-
-
+    free(B);
+    munmap(A, data.st_size);
     close(f);
 
     return 0;
