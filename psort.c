@@ -42,10 +42,6 @@ void* count(void* arg) {
         thisThreadData->localCount[DIG]++;
     }
 
-    printf("Thread number %d\n", thisThreadData->threadID);
-    printf("Thread %d start: %zu\n", thisThreadData->threadID, thisThreadData->start);
-    printf("Thread %d end: %zu\n", thisThreadData->threadID, thisThreadData->end);
-
     pthread_exit(NULL);
 }
 
@@ -119,9 +115,6 @@ int main(int argc, char* argv[]) {
 
     close(f);
 
-    printf("Records: %zu\n", numRecs);
-    printf("Threads: %d\n", NUM_THREADS);
-
     B = malloc(numRecs * sizeof(rec));
     if (!B) {
         perror("malloc B failed\n");
@@ -131,7 +124,6 @@ int main(int argc, char* argv[]) {
     rec *originalB = B;
 
     size_t chunk = (numRecs + NUM_THREADS - 1) / NUM_THREADS;
-    printf("Chunk size: %zu\n", chunk);
 
     for (int p = 0; p < 4; p++) {
 
@@ -154,18 +146,13 @@ int main(int argc, char* argv[]) {
             } 
 
             pthread_create(&threads[i], NULL, count, &args[i]);
-            printf("test\n");
         }
 
         for (int i = 0; i < NUM_THREADS; i++) {
             pthread_join(threads[i], NULL);
         }
 
-        printf("Test after joining\n");
-
         int globalCount[BIT] = {0};
-    
-        printf("Test after calloc for B\n");
 
         // sum the counts of each key value
         for (int x = 0; x < NUM_THREADS; x++) {
@@ -173,8 +160,6 @@ int main(int argc, char* argv[]) {
                 globalCount[j] += args[x].localCount[j];
             }
         }
-
-        printf("Test after accumulating all counts\n");
 
         // count how many elements per key
         for (int m = 1; m < BIT; m++) {
