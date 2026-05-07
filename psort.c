@@ -54,16 +54,7 @@ int main(int argc, char* argv[]) {
     pthread_t threads[NUM_THREADS];
     entryArg args[NUM_THREADS];
 
-    char *filename = malloc(strlen(argv[1]) + 5);
-    if (filename == NULL) {
-        printf("malloc filename failed\n");
-        return 1;
-    }
-
-    strcpy(filename, argv[1]);
-    strcat(filename, ".txt");
-
-    int f = open(filename, O_RDONLY);
+    int f = open(argv[1], O_RDONLY);
     if (f == -1) {
         perror("Open error");
         return 1;
@@ -127,7 +118,6 @@ int main(int argc, char* argv[]) {
     }
 
     close(f);
-    free(filename);
 
     printf("Records: %zu\n", numRecs);
     printf("Threads: %d\n", NUM_THREADS);
@@ -218,10 +208,7 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
 
-    strcpy(outfilename, argv[2]);
-    strcat(outfilename, ".txt");
-
-    outf = fopen(outfilename, "w");
+    outf = fopen(argv[2], "w");
 
     if (outf == NULL) {
         printf("Error opening output file\n");
@@ -236,7 +223,6 @@ int main(int argc, char* argv[]) {
     }
 
     fclose(outf);
-    free(outfilename);
 
     munmap(fileRecords, data.st_size);
     free(originalA);
