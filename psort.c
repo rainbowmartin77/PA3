@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <string.h>
+#include <stdio.h>
 
 #define NUM_THREADS get_nprocs()
 #define BIT 256
@@ -22,7 +23,7 @@ typedef struct {
 rec *A; // input & output
 rec *B; // swapping array
 
-size_t numRecs = 0;
+size_t numRecs;
 
 typedef struct {
     int threadID;
@@ -53,7 +54,16 @@ int main(int argc, char* argv[]) {
     pthread_t threads[NUM_THREADS];
     entryArg args[NUM_THREADS];
 
-    int f = open(argv[1], O_RDONLY);
+    char *filename = malloc(strlen(argv[1]) + 5);
+    if (filename == NULL) {
+        printf("malloc filename failed\n");
+        return 1;
+    }
+
+    strcpy(filename, argv[1]);
+    strcat(filename, ".txt");
+
+    int f = open(filename, O_RDONLY);
     if (f == -1) {
         perror("Open error");
         return 1;
@@ -75,11 +85,11 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    A = malloc(data.st_size / sizeof(rec));
+    A = malloc(data.st_size * sizeof(rec));
 
     rec *originalA = A;
 
-    numRecs = data.st_size / sizeof(rec);
+    numRecs = 0;
 
     size_t counter = 0;
 
@@ -102,7 +112,7 @@ int main(int argc, char* argv[]) {
             r.key = 0;
         }
 
-        size_t restOfString = len - 4;
+        size_t restOfString = (len > 4) ? (len - 4) : 0;
         if (restOfString > 95) {
             restOfString = 95;
         }
@@ -115,6 +125,9 @@ int main(int argc, char* argv[]) {
 
         counter++;
     }
+
+    close(f);
+    free(filename);
 
     printf("Records: %zu\n", numRecs);
     printf("Threads: %d\n", NUM_THREADS);
@@ -196,16 +209,39 @@ int main(int argc, char* argv[]) {
         B = temp;
     }
 
-    for (size_t f = 0; f < numRecs; f++) {
+    FILE *outf;
 
-        char *oRec = (char*)&A[f].key;
+    char *outfilename = malloc(strlen(argv[2]) + 5);
 
-        printf("%c%c%c%c%s\n", oRec[0], oRec[1], oRec[2], oRec[3], A[f].data);
+    if (outfilename == NULL) {
+        perror("malloc outfilename failed\n");
+        exit(1);
     }
 
+    strcpy(outfilename, argv[2]);
+    strcat(outfilename, ".txt");
+
+    outf = fopen(outfilename, "w");
+
+    if (outf == NULL) {
+        printf("Error opening output file\n");
+        return 1;
+    }
+
+    for (size_t n = 0; n < numRecs; n++) {
+
+        char *oRec = (char*)&A[n].key;
+
+        fprintf(outf, "%c%c%c%c%s\n", oRec[0], oRec[1], oRec[2], oRec[3], A[f].data);
+    }
+
+    fclose(outf);
+    free(outfilename);
+
+    munmap(fileRecords, data.st_size);
+    free(originalA);
     free(originalB);
-    munmap(originalA, data.st_size);
-    close(f);
+    //close(f);
 
     return 0;
 }
